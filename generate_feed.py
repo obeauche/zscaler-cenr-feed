@@ -4,7 +4,8 @@
 
 Pulls Zscaler's published Cloud Enforcement Node Ranges (CENR) and hub
 "required" prefixes (ZCC auth, PAC, updates, ZDX control plane) for the
-zscalertwo.net and zscalerthree.net clouds, aggregates the IPv4 ranges into
+zscalertwo.net and zscalerthree.net clouds, plus the ZPA public service edge
+and broker IPs (many are /32s in AWS/Azure), aggregates the IPv4 ranges into
 the smallest lossless set of CIDR blocks, and combines them with a static
 list of ZCC/ZPA control-plane domains that are DNS-resolved (and so can't be
 captured by the IP-range feed alone).
@@ -53,6 +54,13 @@ def fetch_hubs_required(cloud):
         return {p for p in json.load(resp)["hubPrefixes"] if ":" not in p}
 
 
+def fetch_zpa():
+    url = "https://config.zscaler.com/api/private.zscaler.com/zpa/json"
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        data = json.load(resp)
+    return {ip for c in data["content"] for ip in c.get("IPs", []) if ":" not in ip}
+
+
 def collect_v4_ranges(data, cloud):
     v4 = set()
     for _continent, cities in data[cloud].items():
@@ -77,6 +85,11 @@ def main():
             all_ranges |= fetch_hubs_required(cloud)
         except Exception as exc:
             print(f"WARNING: failed to fetch {cloud} hubs: {exc}", file=sys.stderr)
+
+    try:
+        all_ranges |= fetch_zpa()
+    except Exception as exc:
+        print(f"WARNING: failed to fetch ZPA ranges: {exc}", file=sys.stderr)
 
     if not all_ranges:
         print("ERROR: no ranges fetched from any cloud, aborting", file=sys.stderr)
