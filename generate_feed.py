@@ -33,6 +33,12 @@ STATIC_DOMAINS = [
     "healthapp.ecdn.zscaler.com",
 ]
 
+# Zscaler-owned ranges ZCC was seen using that aren't in the CENR data
+# (136.226.118.0/23: live ZCC HTTPS flow observed 2026-10-26).
+STATIC_CIDRS = [
+    "136.226.118.0/23",
+]
+
 
 def fetch_cenr(cloud):
     url = f"https://config.zscaler.com/api/{cloud}/cenr/json"
@@ -65,7 +71,8 @@ def main():
         print("ERROR: no ranges fetched from any cloud, aborting", file=sys.stderr)
         sys.exit(1)
 
-    nets = [ipaddress.ip_network(r, strict=False) for r in all_ranges]
+    nets = [ipaddress.ip_network(r, strict=False)
+            for r in all_ranges | set(STATIC_CIDRS)]
     collapsed = sorted(
         ipaddress.collapse_addresses(nets),
         key=lambda n: (-n.num_addresses, str(n)),
