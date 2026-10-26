@@ -2,7 +2,8 @@
 """Regenerates the flat domain/CIDR feed for the GL.iNet router's
 "Subscription URL" split-tunnel exclusion rule.
 
-Pulls Zscaler's published Cloud Enforcement Node Ranges (CENR) for the
+Pulls Zscaler's published Cloud Enforcement Node Ranges (CENR) and hub
+"required" prefixes (ZCC auth, PAC, updates, ZDX control plane) for the
 zscalertwo.net and zscalerthree.net clouds, aggregates the IPv4 ranges into
 the smallest lossless set of CIDR blocks, and combines them with a static
 list of ZCC/ZPA control-plane domains that are DNS-resolved (and so can't be
@@ -33,8 +34,8 @@ STATIC_DOMAINS = [
     "healthapp.ecdn.zscaler.com",
 ]
 
-# Zscaler-owned ranges ZCC was seen using that aren't in the CENR data
-# (136.226.118.0/23: live ZCC HTTPS flow observed 2026-10-26).
+# Extra Zscaler ranges to always include. 136.226.118.0/23 (live ZCC HTTPS
+# flow seen 2026-10-26) is also in hubs/required; kept as a fallback.
 STATIC_CIDRS = [
     "136.226.118.0/23",
 ]
@@ -44,6 +45,12 @@ def fetch_cenr(cloud):
     url = f"https://config.zscaler.com/api/{cloud}/cenr/json"
     with urllib.request.urlopen(url, timeout=30) as resp:
         return json.load(resp)
+
+
+def fetch_hubs_required(cloud):
+    url = f"https://config.zscaler.com/api/{cloud}/hubs/cidr/json/required"
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        return {p for p in json.load(resp)["hubPrefixes"] if ":" not in p}
 
 
 def collect_v4_ranges(data, cloud):
@@ -66,6 +73,10 @@ def main():
             print(f"WARNING: failed to fetch {cloud}: {exc}", file=sys.stderr)
             continue
         all_ranges |= collect_v4_ranges(data, cloud)
+        try:
+            all_ranges |= fetch_hubs_required(cloud)
+        except Exception as exc:
+            print(f"WARNING: failed to fetch {cloud} hubs: {exc}", file=sys.stderr)
 
     if not all_ranges:
         print("ERROR: no ranges fetched from any cloud, aborting", file=sys.stderr)
