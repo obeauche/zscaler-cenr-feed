@@ -10,6 +10,7 @@ mobilesupport.zscaler.com
 clients4.google.com
 zcc.ecdn.zscaler.com
 healthapp.ecdn.zscaler.com
+220.42.0.0/15
 136.226.0.0/16
 137.31.0.0/16
 159.254.0.0/16
@@ -69,7 +70,6 @@ healthapp.ecdn.zscaler.com
 205.220.80.0/23
 205.220.94.0/23
 220.243.154.0/23
-220.42.16.0/23
 98.98.186.0/23
 98.98.26.0/23
 103.200.220.0/24
